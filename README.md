@@ -4,7 +4,7 @@ QR Chunker is a tool to split a long text into a sequence of QR codes to be sent
 
 ## Features
 
-- **Generate QR Codes:** Split long text into chunks and generate QR codes for each chunk. You can define the chunk length between 500 and 4000 characters (default is 2000 characters).
+- **Generate QR Codes:** Split long text into chunks and generate QR codes for each chunk. You can define the chunk length between **500** and **2950** characters (default is **2000** characters). Above 2950 characters there are tech limitations.
 - **Save and Share QR Codes:** Save individual QR codes as PNG files or share them directly from your mobile device.
 - **Decode QR Codes:** Upload an image or capture one using your webcam to decode QR codes. Append decoded text to the existing text or clear the current scan and total text.
 - **Download All QR Codes:** Download all generated QR codes in sequence automatically.
@@ -17,7 +17,7 @@ QR Chunker is a tool to split a long text into a sequence of QR codes to be sent
    - Paste or type your long text into the textarea provided.
 
 2. **Set Chunk Length:**
-   - Define the chunk length using the input box (minimum 500, maximum 4000, default 2000).
+   - Define the chunk length using the input box (minimum 500, maximum 2950, default 2000).
 
 3. **Generate QRs:**
    - Click the "Generate QRs" button to split the text into chunks and generate QR codes. Each generated QR code will be displayed as a small preview.
