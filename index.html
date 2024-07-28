@@ -95,6 +95,9 @@
         .file-list li {
             margin-bottom: 5px;
         }
+        #camera-options, #quality-options {
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
@@ -114,6 +117,16 @@
         <h2>Part Two: Decode QR Codes</h2>
         <input type="file" accept="image/*" id="file-input" onchange="loadFile(event)"><br>
         <button class="button" onclick="openWebcam()">Open Webcam</button>
+        <div id="camera-options" class="hidden">
+            <label for="camera-select">Select Camera:</label>
+            <select id="camera-select"></select><br>
+            <label for="quality-select">Select Quality:</label>
+            <select id="quality-select">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+            </select><br>
+        </div>
         <video id="webcam" autoplay></video>
         <button class="button" id="capture-button" onclick="captureImage()">Capture</button><br>
         <canvas id="canvas" style="display:none;"></canvas>
@@ -134,6 +147,7 @@
         import QrScanner from "https://unpkg.com/qr-scanner/qr-scanner.min.js";
 
         let currentFileName = '';
+        let currentStream;
 
         window.pasteText = async function() {
             const text = await navigator.clipboard.readText();
@@ -265,15 +279,47 @@
             hiddenPreviewContainer.appendChild(hiddenPreview);
         }
 
-        window.openWebcam = function() {
+        window.openWebcam = async function() {
             const video = document.getElementById('webcam');
-            video.style.display = 'block';
+            const cameraOptions = document.getElementById('camera-options');
+            cameraOptions.classList.remove('hidden');
             const captureButton = document.getElementById('capture-button');
-            captureButton.style.display = 'inline-block';
+            const cameraSelect = document.getElementById('camera-select');
+            const qualitySelect = document.getElementById('quality-select');
 
-            navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-                video.srcObject = stream;
-            }).catch(console.error);
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(device => device.kind === 'videoinput');
+            
+            cameraSelect.innerHTML = '';
+            videoDevices.forEach((device, index) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.text = device.label || `Camera ${index + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            cameraSelect.onchange = startWebcam;
+            qualitySelect.onchange = startWebcam;
+
+            async function startWebcam() {
+                if (currentStream) {
+                    currentStream.getTracks().forEach(track => track.stop());
+                }
+                
+                const constraints = {
+                    video: {
+                        deviceId: { exact: cameraSelect.value },
+                        width: qualitySelect.value === 'high' ? 1280 : qualitySelect.value === 'medium' ? 640 : 320
+                    }
+                };
+                
+                currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = currentStream;
+            }
+
+            startWebcam();
+            video.style.display = 'block';
+            captureButton.style.display = 'inline-block';
         }
 
         window.captureImage = function() {
@@ -299,6 +345,7 @@
 
             video.style.display = 'none';
             document.getElementById('capture-button').style.display = 'none';
+            document.getElementById('camera-options').classList.add('hidden');
 
             video.srcObject.getTracks().forEach(track => track.stop());
         }
