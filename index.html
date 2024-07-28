@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator and Decoder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .qr-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .qr-item {
+            text-align: center;
+            width: 100%;
+            max-width: 200px;
+        }
+        .qr-item svg {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 10px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px 0;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        input[type="file"] {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 5px 0;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+        }
+        input[type="file"]::file-selector-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #45a049;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+        }
+        input[type="number"] {
+            width: 100px;
+        }
+        #webcam {
+            display: none;
+            margin-bottom: 10px;
+            width: 320px; /* Smaller webcam preview */
+        }
+        #image-preview img {
+            max-width: 200px; /* Smaller image preview */
+        }
+        #hidden-image-preview {
+            display: none;
+        }
+        #capture-button {
+            display: none;
+        }
+        .hidden {
+            display: none;
+        }
+        .file-list {
+            list-style-type: decimal;
+            padding-left: 20px;
+        }
+        .file-list li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <h2>Part One: Generate QR Codes</h2>
+        <textarea id="input-text" placeholder="Enter or paste your long text here..."></textarea>
+        <button class="button" onclick="pasteText()">Paste</button><br>
+        <label for="chunk-length">Chunk Length:</label>
+        <input type="number" id="chunk-length" value="2000" min="500" max="4000"><br>
+        <button class="button" onclick="generateQRs()">Generate QRs</button>
+        <button class="button hidden" id="download-all" onclick="downloadAllQRs()">Download All</button>
+        <div id="qr-output" class="qr-container"></div>
+        <div id="hidden-svg-container" class="hidden"></div>
+    </div>
+
+    <div class="section">
+        <h2>Part Two: Decode QR Codes</h2>
+        <input type="file" accept="image/*" id="file-input" onchange="loadFile(event)"><br>
+        <button class="button" onclick="openWebcam()">Open Webcam</button>
+        <video id="webcam" autoplay></video>
+        <button class="button" id="capture-button" onclick="captureImage()">Capture</button><br>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <div id="image-preview"></div>
+        <div id="hidden-image-preview"></div>
+        <button class="button" onclick="decodeQR()">Decode</button>
+        <textarea id="current-scan" placeholder="Current Scan"></textarea>
+        <ul id="file-list" class="file-list"></ul>
+        <button class="button" onclick="nextText()">Next</button>
+        <button class="button" onclick="clearCurrent()">Clear</button>
+        <textarea id="total-text" placeholder="Total Text"></textarea>
+        <button class="button" onclick="clearAll()">Clear All</button>
+        <button class="button" onclick="copyTotal()">Copy</button>
+    </div>
+
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <script type="module">
+        import QrScanner from "https://unpkg.com/qr-scanner/qr-scanner.min.js";
+
+        let currentFileName = '';
+
+        window.pasteText = async function() {
+            const text = await navigator.clipboard.readText();
+            document.getElementById('input-text').value = text;
+        }
+
+        window.generateQRs = async function() {
+            document.getElementById('download-all').classList.add('hidden');
+            const text = document.getElementById('input-text').value;
+            const chunkLength = parseInt(document.getElementById('chunk-length').value);
+            const qrOutput = document.getElementById('qr-output');
+            const hiddenSvgContainer = document.getElementById('hidden-svg-container');
+            qrOutput.innerHTML = '';
+            hiddenSvgContainer.innerHTML = '';
+
+            const chunks = [];
+            for (let i = 0; i < text.length; i += chunkLength) {
+                chunks.push(text.slice(i, i + chunkLength));
+            }
+
+            const writer = new ZXing.BrowserQRCodeSvgWriter();
+
+            for (let index = 0; index < chunks.length; index++) {
+                const chunk = chunks[index];
+                // SVG for display
+                const svgElementSmall = writer.write(chunk, 200, 200);
+                svgElementSmall.setAttribute('id', 'svg-small-' + index);
+                const qrItem = document.createElement('div');
+                qrItem.classList.add('qr-item');
+
+                const fileName = `qr_code_${index + 1}.png`;
+                const fileLabel = document.createElement('div');
+                fileLabel.innerText = fileName;
+                qrItem.appendChild(fileLabel);
+
+                qrItem.appendChild(svgElementSmall);
+
+                // SVG for hidden use (save and share)
+                const svgElementLarge = writer.write(chunk, 1500, 1500);
+                svgElementLarge.setAttribute('id', 'svg-large-' + index);
+                svgElementLarge.classList.add('hidden');
+                hiddenSvgContainer.appendChild(svgElementLarge);
+
+                const saveButton = document.createElement('button');
+                saveButton.innerText = 'Save';
+                saveButton.classList.add('button');
+                saveButton.onclick = () => saveQRCode(svgElementLarge, index);
+
+                const shareButton = document.createElement('button');
+                shareButton.innerText = 'Share';
+                shareButton.classList.add('button');
+                shareButton.style.marginLeft = '10px';
+                shareButton.onclick = () => shareQRCode(svgElementLarge);
+
+                qrItem.appendChild(saveButton);
+                qrItem.appendChild(shareButton);
+                qrOutput.appendChild(qrItem);
+
+                await new Promise(resolve => setTimeout(resolve, 0)); // Yield to event loop
+            }
+
+            document.getElementById('download-all').classList.remove('hidden');
+        }
+
+        window.saveQRCode = function(svgElement, index) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const canvas = document.createElement('canvas');
+            canvas.width = 1500;
+            canvas.height = 1500;
+            const ctx = canvas.getContext('2d');
+
+            const img = new Image();
+            img.onload = () => {
+                ctx.fillStyle = "white"; // White background
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                const pngData = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = pngData;
+                a.download = `qr_code_${index + 1}.png`;
+                a.click();
+            };
+            img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+        }
+
+        window.shareQRCode = function(svgElement) {
+            const svgData = new XMLSerializer().serializeToString(svgElement);
+            const canvas = document.createElement('canvas');
+            canvas.width = 1500;
+            canvas.height = 1500;
+            const ctx = canvas.getContext('2d');
+
+            const img = new Image();
+            img.onload = async () => {
+                ctx.fillStyle = "white"; // White background
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob(async (blob) => {
+                    const file = new File([blob], 'qr_code.png', { type: 'image/png' });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'QR Code',
+                            text: 'Here is your QR Code',
+                        });
+                    } else {
+                        alert('Sharing not supported on this browser.');
+                    }
+                });
+            };
+            img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+        }
+
+        window.loadFile = function(event) {
+            const file = event.target.files[0];
+            currentFileName = file.name;
+            const image = document.createElement('img');
+            image.src = URL.createObjectURL(file);
+            image.onload = () => URL.revokeObjectURL(image.src); // Free memory
+            const preview = document.getElementById('image-preview');
+            preview.innerHTML = '';
+            preview.appendChild(image);
+
+            const hiddenPreview = document.createElement('img');
+            hiddenPreview.src = image.src;
+            hiddenPreview.onload = () => URL.revokeObjectURL(hiddenPreview.src); // Free memory
+            const hiddenPreviewContainer = document.getElementById('hidden-image-preview');
+            hiddenPreviewContainer.innerHTML = '';
+            hiddenPreviewContainer.appendChild(hiddenPreview);
+        }
+
+        window.openWebcam = function() {
+            const video = document.getElementById('webcam');
+            video.style.display = 'block';
+            const captureButton = document.getElementById('capture-button');
+            captureButton.style.display = 'inline-block';
+
+            navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+                video.srcObject = stream;
+            }).catch(console.error);
+        }
+
+        window.captureImage = function() {
+            currentFileName = 'Webcam capture';
+            const video = document.getElementById('webcam');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
+            const imagePreview = document.getElementById('image-preview');
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            imagePreview.innerHTML = '';
+            imagePreview.appendChild(img);
+
+            const hiddenPreview = document.createElement('img');
+            hiddenPreview.src = canvas.toDataURL('image/png');
+            const hiddenPreviewContainer = document.getElementById('hidden-image-preview');
+            hiddenPreviewContainer.innerHTML = '';
+            hiddenPreviewContainer.appendChild(hiddenPreview);
+
+            video.style.display = 'none';
+            document.getElementById('capture-button').style.display = 'none';
+
+            video.srcObject.getTracks().forEach(track => track.stop());
+        }
+
+        window.decodeQR = async function() {
+            const imgElement = document.querySelector('#hidden-image-preview img');
+            if (!imgElement) {
+                alert('Please capture or upload an image first.');
+                return;
+            }
+
+            try {
+                const result = await QrScanner.scanImage(imgElement, { returnDetailedScanResult: true });
+                document.getElementById('current-scan').value = result.data;
+                addFileNameToList(currentFileName);
+            } catch (error) {
+                alert('No QR code found');
+            }
+        }
+
+        window.addFileNameToList = function(fileName) {
+            const fileList = document.getElementById('file-list');
+            const listItem = document.createElement('li');
+            listItem.innerText = fileName;
+            fileList.appendChild(listItem);
+        }
+
+        window.nextText = function() {
+            const currentScan = document.getElementById('current-scan').value;
+            const totalText = document.getElementById('total-text');
+            totalText.value += currentScan;
+            document.getElementById('current-scan').value = '';
+        }
+
+        window.clearCurrent = function() {
+            document.getElementById('current-scan').value = '';
+        }
+
+        window.clearAll = function() {
+            document.getElementById('current-scan').value = '';
+            document.getElementById('total-text').value = '';
+            document.getElementById('file-list').innerHTML = '';
+        }
+
+        window.copyTotal = async function() {
+            const totalText = document.getElementById('total-text').value;
+            await navigator.clipboard.writeText(totalText);
+            alert('Copied to clipboard!');
+        }
+
+        window.downloadAllQRs = function() {
+            const hiddenSvgContainer = document.getElementById('hidden-svg-container');
+            const svgElements = hiddenSvgContainer.querySelectorAll('svg');
+            svgElements.forEach((svgElement, index) => {
+                saveQRCode(svgElement, index);
+            });
+        }
+    </script>
+</body>
+</html>
